@@ -13,7 +13,12 @@ type GameManager struct {
 	games sync.Map // Thread-safe map to store active games
 }
 
-func (gm *GameManager) StartGame(game *models.Game) {
+var (
+	gameManagerInstance *GameManager
+	once                sync.Once
+)
+
+func (gm *GameManager) StartGame(game *Game) {
 	actionChan := make(chan models.GameAction)
 	gameId := game.Id
 
@@ -47,11 +52,51 @@ func (gm *GameManager) StopGame(gameId string) {
 	gm.games.Delete(gameId)
 }
 
-func NewGameManager() *GameManager {
-	return &GameManager{}
+func (gm *GameManager) AddGameToGameManager(game *Game) error {
+	if _, loaded := gm.games.LoadOrStore(game.Id, game); loaded {
+		return fmt.Errorf("game with ID %s already exists", game.Id)
+	}
+	return nil
 }
 
-func gameLoop(game *models.Game, actions chan models.GameAction) {
+func (gm *GameManager) GameExists(gameId string) bool {
+	_, exists := gm.games.Load(gameId)
+	return exists
+}
+
+func (gm *GameManager) GetGame(gameId string) (*Game, error) {
+	value, exists := gm.games.Load(gameId)
+	if !exists {
+		return nil, fmt.Errorf("game with Id %s not found", gameId)
+	}
+	return value.(*Game), nil
+}
+
+func (gm *GameManager) AddPlayerToGame(gameId, playerName string) error {
+	game, error := gm.GetGame(gameId)
+	if error != nil {
+		fmt.Errorf("game not found")
+	}
+
+	newPlayer := CreatePlayer(shuffledFullDeck, playerName)
+
+	if err := game.AddPlayer(newPlayer); err != nil {
+		return err
+	}
+
+	gm.games.Store(game.Id, game)
+	return nil
+}
+
+// Function to get the GameManager instance and create one if needed (Singleton)
+func GetGameManager() *GameManager {
+	once.Do(func() {
+		gameManagerInstance = &GameManager{}
+	})
+	return gameManagerInstance
+}
+
+func gameLoop(game *Game, actions chan models.GameAction) {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -71,7 +116,7 @@ func gameLoop(game *models.Game, actions chan models.GameAction) {
 	}
 }
 
-func handleAction(game *models.Game, action models.GameAction) {
+func handleAction(game *Game, action models.GameAction) {
 	switch action.Type {
 	case enums.ActionPlayCard:
 		// Handle play card logic

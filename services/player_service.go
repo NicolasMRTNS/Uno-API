@@ -5,12 +5,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreatePlayer(fulldeck models.Deck, playerName string) *models.Player {
+func CreatePlayer(fulldeck []models.Card, playerName string) models.Player {
 	initialDeck := models.Deck{
-		Cards:        fulldeck.Cards[:5],
+		Cards:        fulldeck[:5],
 		IsPlayerDeck: true,
 	}
-	return &models.Player{
+	return models.Player{
 		Id:         uuid.NewString(),
 		Name:       playerName,
 		PlayerDeck: initialDeck,
