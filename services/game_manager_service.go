@@ -1,16 +1,19 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/NicolasMRTNS/Uno-API/enums"
 	"github.com/NicolasMRTNS/Uno-API/models"
+	"github.com/gorilla/websocket"
 )
 
 type GameManager struct {
-	games sync.Map // Thread-safe map to store active games
+	games   sync.Map // Thread-safe map of gameId -> *Game
+	sockets sync.Map // Thread-safe map of gameId -> []*websocket.Conn
 }
 
 var (
@@ -18,15 +21,20 @@ var (
 	once                sync.Once
 )
 
-func (gm *GameManager) StartGame(game *Game) {
-	actionChan := make(chan models.GameAction)
-	gameId := game.Id
+func (gm *GameManager) StartGame(gameId string) {
+	game, _ := gameManager.GetGame(gameId)
+	game.State = enums.InProgress
+	gm.games.Store(game.Id, game)
 
-	gm.games.Store(gameId, actionChan)
+	actionChan := make(chan models.GameAction)
+
+	gm.games.Store(game.Id+"_action", actionChan)
 
 	go func() {
-		defer gm.games.Delete(gameId) // Cleanup on game end
-		gameLoop(game, actionChan)
+		defer gm.games.Delete(game.Id) // Cleanup on game end
+		defer gm.games.Delete(game.Id + "_action")
+		defer gm.sockets.Delete(game.Id)
+		gameLoop(game, actionChan, gm)
 	}()
 }
 
@@ -72,11 +80,16 @@ func (gm *GameManager) GetGame(gameId string) (*Game, error) {
 	return value.(*Game), nil
 }
 
-func (gm *GameManager) AddPlayerToGame(gameId, playerName string) error {
-	game, error := gm.GetGame(gameId)
-	if error != nil {
-		fmt.Errorf("game not found")
+func (gm *GameManager) GetSocketConnection(gameId string) (*sync.Map, error) {
+	value, exists := gm.sockets.Load(gameId)
+	if !exists {
+		return nil, fmt.Errorf("socket connection for game ID %s not found", gameId)
 	}
+	return value.(*sync.Map), nil
+}
+
+func (gm *GameManager) AddPlayerToGame(gameId, playerName string) error {
+	game, _ := gm.GetGame(gameId)
 
 	newPlayer := CreatePlayer(shuffledFullDeck, playerName)
 
@@ -88,6 +101,25 @@ func (gm *GameManager) AddPlayerToGame(gameId, playerName string) error {
 	return nil
 }
 
+func (gm *GameManager) AddPlayerSocket(gameId string, conn *websocket.Conn) {
+	value, _ := gm.sockets.LoadOrStore(gameId, &sync.Map{})
+	connections := value.(*sync.Map)
+	connections.Store(conn, true)
+}
+
+func (gm *GameManager) BroadcastToGame(gameId string, message []byte) {
+	connections, _ := gm.GetSocketConnection(gameId)
+	connections.Range(func(key, _ interface{}) bool {
+		conn := key.(*websocket.Conn)
+		err := conn.WriteMessage(websocket.TextMessage, message)
+		if err != nil {
+			conn.Close()
+			connections.Delete(conn)
+		}
+		return true
+	})
+}
+
 // Function to get the GameManager instance and create one if needed (Singleton)
 func GetGameManager() *GameManager {
 	once.Do(func() {
@@ -96,22 +128,22 @@ func GetGameManager() *GameManager {
 	return gameManagerInstance
 }
 
-func gameLoop(game *Game, actions chan models.GameAction) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
+func gameLoop(game *Game, actionChan chan models.GameAction, gm *GameManager) {
 	for {
 		select {
-		case action, ok := <-actions:
-			if !ok {
-				fmt.Printf("Game %s ended\n", game.Id)
-				return
-			}
-
+		case action := <-actionChan:
+			// Process the action
 			handleAction(game, action)
 
-		case <-ticker.C:
-			// Check for inactivity
+			// Broadcast updated game state to all players
+			gameStateJson, _ := json.Marshal(game)
+			gm.BroadcastToGame(game.Id, gameStateJson)
+		default:
+			time.Sleep(1 * time.Second)
+		}
+
+		if game.State == enums.Completed || game.State == enums.Cancelled {
+			break
 		}
 	}
 }

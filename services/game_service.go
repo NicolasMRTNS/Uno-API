@@ -26,12 +26,12 @@ var (
 func (g *Game) AddPlayer(player models.Player) error {
 	for _, p := range g.Players {
 		if p.Id == player.Id {
-			return fmt.Errorf("Player with ID %s already exists", player.Id)
+			return fmt.Errorf("player with ID %s already exists", player.Id)
 		}
 	}
 
 	if g.State != enums.WaitingForPlayers {
-		return fmt.Errorf("Cannot add player as the game has already started")
+		return fmt.Errorf("cannot add player as the game has already started")
 	}
 
 	g.Players = append(g.Players, player)
@@ -49,7 +49,7 @@ func CreateNewGame(playerName string) {
 
 	currentPlayer := CreatePlayer(shuffledFullDeck, playerName)
 
-	game := &models.Game{
+	game := &Game{
 		Id:           uuid.NewString(),
 		Players:      []models.Player{currentPlayer},
 		GameDeck:     startingDeckAndDrawPile[0],
