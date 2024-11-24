@@ -3,11 +3,13 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/NicolasMRTNS/Uno-API/enums"
 	"github.com/NicolasMRTNS/Uno-API/models"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -88,17 +90,21 @@ func (gm *GameManager) GetSocketConnection(gameId string) (*sync.Map, error) {
 	return value.(*sync.Map), nil
 }
 
-func (gm *GameManager) AddPlayerToGame(gameId, playerName string) error {
+func AddPlayerToGame(c *gin.Context) {
+	gameId := c.Param("game_id")
+	playerName := c.Param("player_name")
+	gm := gameManagerInstance
+
 	game, _ := gm.GetGame(gameId)
 
-	newPlayer := CreatePlayer(shuffledFullDeck, playerName)
+	newPlayer := CreatePlayer(fullDeck, playerName)
 
 	if err := game.AddPlayer(newPlayer); err != nil {
-		return err
+		fmt.Print(err)
 	}
 
 	gm.games.Store(game.Id, game)
-	return nil
+	c.JSON(http.StatusCreated, game)
 }
 
 func (gm *GameManager) AddPlayerSocket(gameId string, conn *websocket.Conn) {

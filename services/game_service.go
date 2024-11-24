@@ -2,10 +2,12 @@ package services
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/NicolasMRTNS/Uno-API/enums"
 	"github.com/NicolasMRTNS/Uno-API/models"
 	"github.com/NicolasMRTNS/Uno-API/utils"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -15,12 +17,12 @@ type Game struct {
 	GameDeck     models.Card     `json:"gameDeck"`
 	DrawPile     models.Deck     `json:"drawPile"`
 	State        enums.GameState `json:"state"`
-	ActivePlayer models.Player   `json:"activePlayer"`
+	ActivePlayer string          `json:"activePlayer"`
 }
 
 var (
-	shuffledFullDeck = utils.ShuffleDeck(utils.GenerateFullDeck())
-	gameManager      = GetGameManager()
+	fullDeck    = utils.GenerateFullDeck()
+	gameManager = GetGameManager()
 )
 
 func (g *Game) AddPlayer(player models.Player) error {
@@ -38,7 +40,8 @@ func (g *Game) AddPlayer(player models.Player) error {
 	return nil
 }
 
-func CreateNewGame(playerName string) {
+func CreateNewGame(c *gin.Context) {
+	shuffledFullDeck := utils.ShuffleDeck(fullDeck)
 	// Get 21 cards: 1 card for the main game deck and 20 for the draw pile
 	startingDeckAndDrawPile := shuffledFullDeck[:21]
 
@@ -46,6 +49,9 @@ func CreateNewGame(playerName string) {
 		Cards:        startingDeckAndDrawPile[1:],
 		IsPlayerDeck: false,
 	}
+
+	playerName := c.Param("player_name")
+	println(c.Request.URL.String())
 
 	currentPlayer := CreatePlayer(shuffledFullDeck, playerName)
 
@@ -55,8 +61,9 @@ func CreateNewGame(playerName string) {
 		GameDeck:     startingDeckAndDrawPile[0],
 		DrawPile:     startingDrawPile,
 		State:        enums.WaitingForPlayers,
-		ActivePlayer: currentPlayer,
+		ActivePlayer: currentPlayer.Id,
 	}
 
 	gameManager.AddGameToGameManager(game)
+	c.JSON(http.StatusOK, game)
 }

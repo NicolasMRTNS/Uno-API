@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/NicolasMRTNS/Uno-API/services"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -20,13 +21,15 @@ var connections = make(map[*websocket.Conn]bool)
 func main() {
 	router := gin.Default()
 
-	router.GET("/ws", HandlerWebSocket)
+	router.POST("/create-game/:player_name", services.CreateNewGame)
+	router.POST("/add-player/:game_id/:player_name", services.AddPlayerToGame)
+	router.GET("/ws", handlerWebSocket)
 
 	router.Run(":8080")
 }
 
 // Handles incoming WebSocket connections
-func HandlerWebSocket(c *gin.Context) {
+func handlerWebSocket(c *gin.Context) {
 	// Upgrade the HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
