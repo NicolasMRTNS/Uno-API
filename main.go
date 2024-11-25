@@ -21,8 +21,10 @@ var connections = make(map[*websocket.Conn]bool)
 func main() {
 	router := gin.Default()
 
-	router.POST("/create-game/:player_name", services.CreateNewGame)
-	router.POST("/add-player/:game_id/:player_name", services.AddPlayerToGame)
+	router.POST("/create-game/:playerName", services.CreateNewGame)
+	router.POST("/add-player/:gameId/:playerName", services.AddPlayerToGame)
+	router.POST("start-game/:gameId", services.StartGame)
+
 	router.GET("/ws", handlerWebSocket)
 
 	router.Run(":8080")
@@ -30,6 +32,9 @@ func main() {
 
 // Handles incoming WebSocket connections
 func handlerWebSocket(c *gin.Context) {
+	playerId := c.Param("playerId")
+	gameId := c.Param("gameId")
+
 	// Upgrade the HTTP connection to WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -37,10 +42,12 @@ func handlerWebSocket(c *gin.Context) {
 		return
 	}
 	defer conn.Close()
+	gameManager := services.GameManagerInstance
 
-	// Register the connection
-	connections[conn] = true
-	defer delete(connections, conn)
+	if err := gameManager.AddPlayerSocket(gameId, playerId, conn); err != nil {
+		conn.WriteMessage(websocket.TextMessage, []byte("Error: "+err.Error()))
+		return
+	}
 
 	for {
 		// Read message from the client

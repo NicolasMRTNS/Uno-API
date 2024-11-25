@@ -19,7 +19,7 @@ type GameManager struct {
 }
 
 var (
-	gameManagerInstance *GameManager
+	GameManagerInstance *GameManager
 	once                sync.Once
 )
 
@@ -91,9 +91,9 @@ func (gm *GameManager) GetSocketConnection(gameId string) (*sync.Map, error) {
 }
 
 func AddPlayerToGame(c *gin.Context) {
-	gameId := c.Param("game_id")
-	playerName := c.Param("player_name")
-	gm := gameManagerInstance
+	gameId := c.Param("gameId")
+	playerName := c.Param("playerName")
+	gm := GetGameManager()
 
 	game, _ := gm.GetGame(gameId)
 
@@ -107,31 +107,54 @@ func AddPlayerToGame(c *gin.Context) {
 	c.JSON(http.StatusCreated, game)
 }
 
-func (gm *GameManager) AddPlayerSocket(gameId string, conn *websocket.Conn) {
-	value, _ := gm.sockets.LoadOrStore(gameId, &sync.Map{})
-	connections := value.(*sync.Map)
-	connections.Store(conn, true)
+func StartGame(c *gin.Context) {
+	gameId := c.Param("gameId")
+	game, _ := GameManagerInstance.GetGame(gameId)
+	if len(game.Players) >= 2 {
+		game = game.SetGameStatus(enums.InProgress)
+		GameManagerInstance.games.Store(game.Id, game)
+		c.JSON(http.StatusOK, game)
+	} else {
+		c.JSON(http.StatusBadRequest, game)
+	}
 }
 
-func (gm *GameManager) BroadcastToGame(gameId string, message []byte) {
-	connections, _ := gm.GetSocketConnection(gameId)
-	connections.Range(func(key, _ interface{}) bool {
-		conn := key.(*websocket.Conn)
-		err := conn.WriteMessage(websocket.TextMessage, message)
-		if err != nil {
-			conn.Close()
-			connections.Delete(conn)
+func (gm *GameManager) AddPlayerSocket(gameID, playerID string, conn *websocket.Conn) error {
+	// Retrieve the game from the manager
+	game, _ := gm.GetGame(gameID)
+
+	// Add the player's WebSocket to the game's PlayerSockets
+	game.Mutex.Lock()
+	defer game.Mutex.Unlock()
+
+	// Check if the player is part of the game
+	playerFound := false
+	for _, player := range game.Players {
+		if player.Id == playerID {
+			playerFound = true
+			break
 		}
-		return true
-	})
+	}
+
+	if !playerFound {
+		return fmt.Errorf("player %s is not in the game", playerID)
+	}
+
+	// Add the WebSocket connection
+	if game.PlayerSockets == nil {
+		game.PlayerSockets = make(map[string]*websocket.Conn)
+	}
+
+	game.PlayerSockets[playerID] = conn
+	return nil
 }
 
 // Function to get the GameManager instance and create one if needed (Singleton)
 func GetGameManager() *GameManager {
 	once.Do(func() {
-		gameManagerInstance = &GameManager{}
+		GameManagerInstance = &GameManager{}
 	})
-	return gameManagerInstance
+	return GameManagerInstance
 }
 
 func gameLoop(game *Game, actionChan chan models.GameAction, gm *GameManager) {
@@ -143,7 +166,7 @@ func gameLoop(game *Game, actionChan chan models.GameAction, gm *GameManager) {
 
 			// Broadcast updated game state to all players
 			gameStateJson, _ := json.Marshal(game)
-			gm.BroadcastToGame(game.Id, gameStateJson)
+			game.Broadcast(gameStateJson)
 		default:
 			time.Sleep(1 * time.Second)
 		}
