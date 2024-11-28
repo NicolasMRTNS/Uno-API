@@ -187,3 +187,51 @@ func handleAction(game *Game, action models.GameAction) {
 		// Handle end turn logic
 	}
 }
+
+// TODO: Reorganize these next functions
+func findPlayerById(game *Game, playerId string) *models.Player {
+	for _, player := range game.Players {
+		if player.Id == playerId {
+			return &player
+		}
+	}
+	return nil
+}
+
+func findCardInHand(player *models.Player, cardToPlay *models.Card) (*models.Card, error) {
+	for _, card := range player.PlayerDeck.Cards {
+		if card.Value == cardToPlay.Value && card.Color == cardToPlay.Color {
+			return &card, nil
+		}
+	}
+	return nil, fmt.Errorf("card not found in hand")
+}
+
+func removeCardFromHand(player *models.Player, card *models.Card) {
+	for i, c := range player.PlayerDeck.Cards {
+		if c.Color == card.Color && c.Value == card.Value {
+			player.PlayerDeck.Cards = append(player.PlayerDeck.Cards[:i], player.PlayerDeck.Cards[i+1:]...)
+			return
+		}
+	}
+}
+
+func canPlayCard(game *Game, card *models.Card) bool {
+	return card.Color == game.GameDeck.Color && card.Value == game.GameDeck.Value
+}
+
+func handleSpecialCard(game *Game, card *models.Card) {
+	switch card.Value {
+	case enums.Skip:
+		// Skip next player
+	case enums.Reverse:
+		// reversePlayersOrder
+	case enums.DrawTwo:
+		// drawCardsForNextPlayer
+	case enums.CardValue(enums.Wild):
+		// Let the player choose a color
+	case enums.WildDrawFour:
+		// drawCardsForNextPlayer
+		// Let the player choose a color
+	}
+}
