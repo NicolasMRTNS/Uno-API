@@ -180,7 +180,33 @@ func gameLoop(game *Game, actionChan chan models.GameAction, gm *GameManager) {
 func handleAction(game *Game, action models.GameAction) {
 	switch action.Type {
 	case enums.ActionPlayCard:
-		// Handle play card logic
+		player := findPlayerById(game, action.PlayerId)
+		if player == nil {
+			fmt.Printf("Player %s not found \n", action.PlayerId)
+			return
+		}
+
+		// Validate the card exists in the player's hand
+		card, err := findCardInHand(player, &action.Card)
+		if err != nil {
+			fmt.Println("Invalid card: ", card)
+			return
+		}
+
+		// Validate if the card can be played
+		if !canPlayCard(game, card) {
+			fmt.Println("Card cannot be played: ", card)
+			return
+		}
+
+		// Play the card
+		removeCardFromHand(player, card)
+		game.GameDeck = *card
+
+		// Handle special card effects
+		handleSpecialCard(game, card)
+
+		fmt.Printf("Player %s played card %s\n", action.PlayerId, card)
 	case enums.ActionDrawCard:
 		// Handle card draw logic
 	case enums.ActionEndTurn:
