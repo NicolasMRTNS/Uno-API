@@ -9,6 +9,7 @@ import (
 
 	"github.com/NicolasMRTNS/Uno-API/enums"
 	"github.com/NicolasMRTNS/Uno-API/models"
+	"github.com/NicolasMRTNS/Uno-API/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -178,14 +179,14 @@ func gameLoop(game *Game, actionChan chan models.GameAction, gm *GameManager) {
 }
 
 func handleAction(game *Game, action models.GameAction) {
+	player := findPlayerById(game, action.PlayerId)
+	if player == nil {
+		fmt.Printf("Player %s not found \n", action.PlayerId)
+		return
+	}
+
 	switch action.Type {
 	case enums.ActionPlayCard:
-		player := findPlayerById(game, action.PlayerId)
-		if player == nil {
-			fmt.Printf("Player %s not found \n", action.PlayerId)
-			return
-		}
-
 		// Validate the card exists in the player's hand
 		card, err := findCardInHand(player, &action.Card)
 		if err != nil {
@@ -207,10 +208,30 @@ func handleAction(game *Game, action models.GameAction) {
 		handleSpecialCard(game, card)
 
 		fmt.Printf("Player %s played card %s\n", action.PlayerId, card)
+
 	case enums.ActionDrawCard:
-		// Handle card draw logic
+		// Get the card drawn
+		cardDrawn := game.DrawPile.Cards[0]
+
+		// Remove the card from the pile
+		game.DrawPile.Cards = game.DrawPile.Cards[1:]
+
+		// Add the card to the player's deck
+		player.PlayerDeck.Cards = append(player.PlayerDeck.Cards, cardDrawn)
+
+		// Refill the pile
+		game.DrawPile.Cards = append(game.DrawPile.Cards, utils.ShuffleDeck(fullDeck)[0])
+
+		fmt.Printf("Player %s drew a card: %s\n", action.PlayerId, cardDrawn)
 	case enums.ActionEndTurn:
-		// Handle end turn logic
+		if len(player.PlayerDeck.Cards) == 0 {
+			game.State = enums.Completed
+			fmt.Printf("Player %s has won the game!\n", action.PlayerId)
+			return
+		}
+
+		//moveToNextPlayerWithDirection(game)
+		fmt.Printf("Turn ended. Next player is: %s\n", game.ActivePlayer)
 	}
 }
 
