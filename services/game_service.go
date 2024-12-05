@@ -19,7 +19,7 @@ type Game struct {
 	GameDeck      models.Card     `json:"gameDeck"`
 	DrawPile      models.Deck     `json:"drawPile"`
 	State         enums.GameState `json:"state"`
-	ActivePlayer  string          `json:"activePlayer"`
+	ActivePlayer  models.Player   `json:"activePlayer"`
 	Reverse       bool            `json:"reverse"`
 	PlayerSockets map[string]*websocket.Conn
 	Mutex         sync.Mutex

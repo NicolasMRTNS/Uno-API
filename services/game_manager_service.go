@@ -230,7 +230,7 @@ func handleAction(game *Game, action models.GameAction) {
 			return
 		}
 
-		//moveToNextPlayerWithDirection(game)
+		selectNextPlayer(game)
 		fmt.Printf("Turn ended. Next player is: %s\n", game.ActivePlayer)
 	}
 }
@@ -270,9 +270,9 @@ func canPlayCard(game *Game, card *models.Card) bool {
 func handleSpecialCard(game *Game, card *models.Card) {
 	switch card.Value {
 	case enums.Skip:
-		// Skip next player
+		selectNextPlayer(game)
 	case enums.Reverse:
-		// reversePlayersOrder
+		reversePlayDirection(game)
 	case enums.DrawTwo:
 		// drawCardsForNextPlayer
 	case enums.CardValue(enums.Wild):
@@ -281,4 +281,44 @@ func handleSpecialCard(game *Game, card *models.Card) {
 		// drawCardsForNextPlayer
 		// Let the player choose a color
 	}
+}
+
+func selectNextPlayer(game *Game) {
+	nextPlayer := getNextPlayerWithDirection(game, 1)
+	if nextPlayer != nil {
+		game.ActivePlayer = *nextPlayer
+		fmt.Printf("Player skipped! Next player is: %s\n", game.ActivePlayer)
+	}
+}
+
+// The step parameter is in case we need to skip more than one player
+func getNextPlayerWithDirection(game *Game, step int) *models.Player {
+	// Find the current player's index
+	currentIndex := -1
+	for i, player := range game.Players {
+		if player.Id == game.ActivePlayer.Id {
+			currentIndex = i
+			break
+		}
+	}
+
+	if currentIndex == -1 {
+		fmt.Println("Error: ActivePlayer not found in Players list")
+		return nil
+	}
+
+	// Calculate the next index with the given step
+	var nextIndex int
+	if game.Reverse {
+		nextIndex = (currentIndex - step + len(game.Players)) % len(game.Players)
+	} else {
+		nextIndex = (currentIndex + step) % len(game.Players)
+	}
+
+	// Return the next player
+	return &game.Players[nextIndex]
+}
+
+func reversePlayDirection(game *Game) {
+	game.Reverse = !game.Reverse
 }
