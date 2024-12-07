@@ -264,7 +264,7 @@ func removeCardFromHand(player *models.Player, card *models.Card) {
 }
 
 func canPlayCard(game *Game, card *models.Card) bool {
-	return card.Color == game.GameDeck.Color && card.Value == game.GameDeck.Value
+	return card.Color == game.GameDeck.Color || card.Value == game.GameDeck.Value
 }
 
 func handleSpecialCard(game *Game, card *models.Card) {
@@ -274,11 +274,11 @@ func handleSpecialCard(game *Game, card *models.Card) {
 	case enums.Reverse:
 		reversePlayDirection(game)
 	case enums.DrawTwo:
-		// drawCardsForNextPlayer
+		drawCardsForNextPlayer(game, 2)
 	case enums.CardValue(enums.Wild):
 		// Let the player choose a color
 	case enums.WildDrawFour:
-		// drawCardsForNextPlayer
+		drawCardsForNextPlayer(game, 4)
 		// Let the player choose a color
 	}
 }
@@ -288,6 +288,13 @@ func selectNextPlayer(game *Game) {
 	if nextPlayer != nil {
 		game.ActivePlayer = *nextPlayer
 		fmt.Printf("Player skipped! Next player is: %s\n", game.ActivePlayer)
+	}
+}
+
+func drawCardsForNextPlayer(game *Game, numberOfCardsToDraw int) {
+	nextPlayer := getNextPlayerWithDirection(game, 1)
+	if nextPlayer != nil {
+		nextPlayer.PlayerDeck.Cards = append(nextPlayer.PlayerDeck.Cards, utils.ShuffleDeck(fullDeck)[numberOfCardsToDraw:]...)
 	}
 }
 
