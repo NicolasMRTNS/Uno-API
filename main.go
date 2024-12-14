@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/NicolasMRTNS/Uno-API/services"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -20,6 +21,8 @@ var connections = make(map[*websocket.Conn]bool)
 
 func main() {
 	router := gin.Default()
+
+	router.Use(cors.Default())
 
 	router.POST("/create-game/:playerName", services.CreateNewGame)
 	router.POST("/add-player/:gameId/:playerName", services.AddPlayerToGame)

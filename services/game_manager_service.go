@@ -231,7 +231,7 @@ func handleAction(game *Game, action models.GameAction) {
 		}
 
 		selectNextPlayer(game)
-		fmt.Printf("Turn ended. Next player is: %s\n", game.ActivePlayer)
+		fmt.Printf("Turn ended. Next player is: %s\n", game.ActivePlayer.Id)
 	}
 }
 
@@ -287,7 +287,7 @@ func selectNextPlayer(game *Game) {
 	nextPlayer := getNextPlayerWithDirection(game, 1)
 	if nextPlayer != nil {
 		game.ActivePlayer = *nextPlayer
-		fmt.Printf("Player skipped! Next player is: %s\n", game.ActivePlayer)
+		fmt.Printf("Player skipped! Next player is: %s\n", game.ActivePlayer.Id)
 	}
 }
 

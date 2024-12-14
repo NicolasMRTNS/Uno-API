@@ -109,7 +109,7 @@ func CreateNewGame(c *gin.Context) {
 		GameDeck:     startingDeckAndDrawPile[0],
 		DrawPile:     startingDrawPile,
 		State:        enums.WaitingForPlayers,
-		ActivePlayer: currentPlayer.Id,
+		ActivePlayer: currentPlayer,
 	}
 
 	gameManager.AddGameToGameManager(game)
